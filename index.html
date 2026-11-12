@@ -34,6 +34,7 @@ button{font:900 20px system-ui;padding:14px 26px;border:0;border-radius:40px;col
 <div id=H hidden><div id=top><b id=rd></b><span id=ct></span><button onclick=addPlayer()>➕ ADD PLAYER</button><span id=tm></span></div><div id=timer><i id=tb></i></div><main id=stage></main><div id=cap></div><div id=pod></div></div>
 <div id=app hidden></div>
 <div id=ov hidden><b id=omsg style="font-size:20px;color:#ffe02b"></b><canvas id=ovq class=qc></canvas><video id=ovv playsinline muted autoplay></video><div><button onclick=addPlayer()>RETRY</button><button onclick=closeOv()>DONE</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 /* ===== QR encoder (byte mode, ECC L, mask 0) ===== */
 function qr(text){const data=[...new TextEncoder().encode(text)],ECC=[7,10,15,20,26,18,20,24,30,18,20,24,26,30],NB=[1,1,1,1,1,2,2,2,2,4,4,4,4,4];
@@ -67,10 +68,12 @@ return t+[g(/a=ice-ufrag:(\S+)/),g(/a=ice-pwd:(\S+)/),b64(g(/a=fingerprint:sha-2
 function unpack(s){const[u,p,f,c]=s.slice(1).split('|'),o=s[0]=='O';return{type:o?'offer':'answer',sdp:['v=0','o=- 1 2 IN IP4 127.0.0.1','s=-','t=0 0','a=group:BUNDLE 0','a=msid-semantic: WMS','m=application 9 UDP/DTLS/SCTP webrtc-datachannel','c=IN IP4 0.0.0.0','a=ice-ufrag:'+u,'a=ice-pwd:'+p,'a=fingerprint:sha-256 '+unb(f),'a=setup:'+(o?'actpass':'active'),'a=mid:0','a=sctp-port:5000','a=max-message-size:262144',...c.split(',').filter(Boolean).map((x,i)=>{const[h,pt]=x.split(':');return`a=candidate:${i+1} 1 udp ${2113937151-i} ${h} ${pt} typ host`})].join('\r\n')+'\r\n'}}
 const gather=pc=>new Promise(r=>{if(pc.iceGatheringState=='complete')return r();const f=()=>{if(pc.iceGatheringState=='complete'){pc.removeEventListener('icegatheringstatechange',f);r()}};pc.addEventListener('icegatheringstatechange',f);setTimeout(r,2500)});
 const getCam=()=>navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-function scan(v,cb){const bd=new BarcodeDetector({formats:['qr_code']});let on=true;(async function L(){if(!on)return;try{const r=await bd.detect(v);if(r[0]&&cb(r[0].rawValue)===true){on=false;return}}catch(e){}setTimeout(L,150)})();return()=>on=false}
+const canScan=()=>!!(window.BarcodeDetector||window.jsQR);
+function scan(v,cb){let on=true;const bd=window.BarcodeDetector?new BarcodeDetector({formats:['qr_code']}):null,cv=document.createElement('canvas'),c=cv.getContext('2d',{willReadFrequently:true});
+(async function L(){if(!on)return;try{let val;if(bd){const r=await bd.detect(v);val=r[0]&&r[0].rawValue}else if(window.jsQR&&v.videoWidth){const w=Math.min(v.videoWidth,800),h=w*v.videoHeight/v.videoWidth|0;cv.width=w;cv.height=h;c.drawImage(v,0,0,w,h);const q=jsQR(c.getImageData(0,0,w,h).data,w,h);val=q&&q.data}if(val&&cb(val)===true){on=false;return}}catch(e){}setTimeout(L,150)})();return()=>on=false}
 const $=id=>document.getElementById(id),sl=ms=>new Promise(r=>setTimeout(r,ms)),pick=a=>a[Math.random()*a.length|0],now=()=>Date.now()/1000;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-if(!window.BarcodeDetector)$('nb').textContent='Heads up: QR scanning needs Chrome (or another browser with BarcodeDetector) on Android. Hosting needs it most.';
+if(!canScan())$('nb').textContent='QR reader not loaded yet. Open this page once while online, then it will work offline.';
 /* ===== game engine (runs on host phone) ===== */
 const ROUNDS=5,WRITE=60,CATS=["Things you'd say at a campsite at 3 AM","Worst excuses for being late","A terrible name for a boat","Secret ingredients in grandma's cooking","Things a pirate texts his mom","Rejected superhero powers","Bad advice from a gas station","Why the chicken really crossed the road","A new law that should exist","What the dog is thinking right now","Reviews of a haunted hotel","Overheard at a motorcycle rally","Worst first date idea","Slogans for a bad restaurant","Things you shouldn't yell in a library"],
 LET='AAABBCCCDDEEEFFGGHHIIJKLLMMNNOOPPRRSSSTTUVWY',COL=['#ff2bd6','#2bd9ff','#ffe02b','#5bff6a','#ff7a2b','#a66bff','#ff4b5c','#2bffc6'];
@@ -102,9 +105,8 @@ return{ok:1}}
 /* ===== host: pairing overlay ===== */
 let cam,stopScan,pend,peers=[];
 async function addPlayer(){$('ov').hidden=false;if(stopScan)stopScan();if(pend)pend.close();$('omsg').textContent='Starting camera...';
-if(!window.BarcodeDetector){$('omsg').textContent='This browser cannot scan QR codes. Use Chrome on Android to host.';return}
 try{cam=cam||await getCam()}catch(e){$('omsg').textContent='Camera permission is needed to pair players.';return}
-$('ovv').srcObject=cam;const pc=new RTCPeerConnection({iceServers:[]}),dc=pc.createDataChannel('g');pend=pc;peers.push(pc);
+$('ovv').srcObject=cam;$('ovv').play().catch(()=>{});const pc=new RTCPeerConnection({iceServers:[]}),dc=pc.createDataChannel('g');pend=pc;peers.push(pc);
 dc.onopen=()=>{pend=null;sfx.ding();say('A new contestant has connected!');boom(innerWidth/2,innerHeight/3,60);addPlayer()};
 dc.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch(x){return}if(!d.pid||!['hi','join','ans','vote'].includes(d.a))return;conns[d.pid]=dc;dc.send(JSON.stringify({r:act(d)}))};
 await pc.setLocalDescription(await pc.createOffer());await gather(pc);if(pend!==pc)return;drawQR($('ovq'),pack(pc.localDescription.sdp,'O'));
@@ -160,9 +162,9 @@ let n=0;const iv=setInterval(()=>{if(t!==tok||n++>14)return clearInterval(iv);bo
 let ptok=localStorage.acro_tok||(localStorage.acro_tok=Math.random().toString(36).slice(2)+Date.now().toString(36)),dcP,PS,sig='';
 const A=()=>$('app'),send=b=>dcP&&dcP.readyState==='open'&&dcP.send(JSON.stringify({...b,pid:ptok}));
 function goJoin(){$('menu').hidden=true;A().hidden=false;A().innerHTML='<h1>ACRO·SHOW</h1><h2>Step into the studio!</h2><p style="max-width:380px">Tap below, then point your camera at the code on the host\'s screen.</p><button onclick=scanHost()>SCAN HOST\'S CODE</button>'}
-async function scanHost(){if(!window.BarcodeDetector){A().innerHTML='<h2>This browser can\'t scan QR codes. Try Chrome on Android.</h2>';return}
+async function scanHost(){if(!canScan()){A().innerHTML='<h2>The QR reader did not load. Open this page once with internet, then try again.</h2>';return}
 let c;try{c=await getCam()}catch(e){A().innerHTML='<h2>Camera permission is needed to join.</h2><button onclick=scanHost()>TRY AGAIN</button>';return}
-A().innerHTML='<h2>Looking for the host\'s code...</h2><video id=pv playsinline muted autoplay></video>';$('pv').srcObject=c;scan($('pv'),s=>{if(s[0]!=='O')return;connect(s,c);return true})}
+A().innerHTML='<h2>Looking for the host\'s code...</h2><video id=pv playsinline muted autoplay></video>';$('pv').srcObject=c;$('pv').play().catch(()=>{});scan($('pv'),s=>{if(s[0]!=='O')return;connect(s,c);return true})}
 async function connect(s,cam){A().innerHTML='<h2>Connecting...</h2>';const pc=new RTCPeerConnection({iceServers:[]});
 pc.ondatachannel=e=>{dcP=e.channel;dcP.onopen=()=>{cam.getTracks().forEach(t=>t.stop());send({a:'hi'});if(localStorage.acro_nm)send({a:'join',name:localStorage.acro_nm})};dcP.onmessage=onMsg;dcP.onclose=lost};
 pc.onconnectionstatechange=()=>{if(['failed','closed'].includes(pc.connectionState))lost()};
@@ -181,4 +183,5 @@ else if(ph==='result')A().innerHTML=`<h2>Round ${PS.round} results</h2><div clas
 else if(ph==='final'){const r=[...PS.players].sort((a,b)=>b.score-a.score).findIndex(p=>p.n===m.n)+1;A().innerHTML=`<h1>${r==1?'👑 CHAMPION!':'#'+r}</h1><h2>${m.score} points</h2>`}}
 function pjoin(){const n=$('nm').value.trim();if(!n)return;localStorage.acro_nm=n;send({a:'join',name:n})}
 const psub=()=>send({a:'ans',text:$('tx').value}),pvote=n=>send({a:'vote',n});
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
