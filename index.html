@@ -29,10 +29,11 @@ button{font:900 20px system-ui;padding:14px 26px;border:0;border-radius:40px;col
 #app input{width:100%;max-width:420px;font:700 22px system-ui;padding:14px;border-radius:14px;border:3px solid #2bd9ff;background:#000a;color:#fff;margin:8px 0}
 #app .t{width:60px;margin:4px;font-size:42px}#app .v{display:block;width:100%;max-width:480px;text-align:left;font-size:20px;border-radius:16px;animation:pop .4s}#app .v:disabled{opacity:.4;background:#444;box-shadow:none}
 .big{font:900 80px Impact;color:#5bff6a;text-shadow:0 0 30px #5bff6a;animation:pop .6s}.pulse{animation:glow 2s infinite;border-radius:20px;padding:20px}
+#hx{font:700 20px system-ui;padding:12px;border-radius:14px;border:3px solid #2bd9ff;background:#000a;color:#fff;width:min(90vw,480px);margin:6px}
 @media (max-height:520px){#cap{min-height:36px;padding:4px 14px;font-size:16px}#pod{padding:4px}.chip{padding:4px 10px;font-size:14px}.chip b{font-size:20px}#top{padding:2px 14px;font-size:15px}#top button{padding:6px 12px}.cd,.rr{padding:6px 14px;margin:4px auto}.logo{margin:0}}
 @media (orientation:landscape){#ov{flex-direction:row;flex-wrap:wrap;overflow:auto}#omsg,#ov>div{width:100%}#ov .qc{width:min(40vw,52vh)}#ov video{width:min(40vw,52vh)}#app .qc{width:min(60vw,70vh)}}
 </style><div class=sp></div><canvas id=fx></canvas>
-<div id=menu><h1 class=logo>ACRO·SHOW</h1><button onclick=goHost()>🎤 HOST A SHOW</button><button onclick=goJoin()>📱 JOIN A SHOW</button><p id=nb style="max-width:420px;color:#ff4b5c"></p></div>
+<div id=menu><h1 class=logo>ACRO·SHOW</h1><button onclick=goHost()>🎤 HOST A SHOW</button><button onclick=goHost(true)>🧪 PRACTICE (1 phone)</button><button onclick=goJoin()>📱 JOIN A SHOW</button><p id=nb style="max-width:420px;color:#ff4b5c"></p></div>
 <div id=H hidden><div id=top><b id=rd></b><span id=ct></span><button onclick=addPlayer()>➕ ADD PLAYER</button><span id=tm></span></div><div id=timer><i id=tb></i></div><main id=stage></main><div id=cap></div><div id=pod></div></div>
 <div id=app hidden></div>
 <div id=ov hidden><b id=omsg style="font-size:20px;color:#ffe02b"></b><canvas id=ovq class=qc></canvas><video id=ovv playsinline muted autoplay></video><div><button onclick=addPlayer()>RETRY</button><button onclick=closeOv()>DONE</button></div></div>
@@ -98,7 +99,7 @@ if(ph==='vote')d.answers=G.order.map(k=>({n:pl[k].n,text:G.ans[k].t}));if(ph==='
 if(pl[pid]){const m=pl[pid];d.me={n:m.n,name:m.name,score:m.score,gain:m.gain||0,sub:pid in G.ans,voted:pid in G.votes}}return d}
 function act(d){const a=d.a,pid=d.pid,pl=G.pl;
 if(a==='join'){if(pid&&!pl[pid]){G.cnt++;pl[pid]={n:G.cnt,name:String(d.name||'').replace(/\s+/g,' ').trim().slice(0,12)||'Player',color:COL[(G.cnt-1)%COL.length],score:0}}}
-else if(a==='start'&&G.phase==='lobby'&&Object.keys(pl).length>=2)newround();
+else if(a==='start'&&G.phase==='lobby'&&Object.keys(pl).length>=(PRACTICE?1:2))newround();
 else if(a==='next'&&G.phase==='result'){if(G.round>=ROUNDS)G.phase='final';else newround()}
 else if(a==='again')reset(false);
 else if(a==='ans'&&G.phase==='write'&&pl[pid]&&!(pid in G.ans)){const t=String(d.text||'').replace(/\s+/g,' ').trim().slice(0,90),e=valid(t);if(e)return{err:e};G.ans[pid]={t,at:now()}}
@@ -116,7 +117,7 @@ $('omsg').textContent='Next player: tap JOIN, scan this code, then show me your 
 stopScan=scan($('ovv'),s=>{if(s[0]!=='A')return;pc.setRemoteDescription(unpack(s)).catch(()=>{$('omsg').textContent='Bad code, tap RETRY'});$('omsg').textContent='Connecting...';setTimeout(()=>{if(pend===pc)$('omsg').textContent='Could not connect. Same Wi-Fi/hotspot? Tap RETRY'},12000);return true})}
 function closeOv(){if(stopScan)stopScan();if(pend)pend.close();pend=null;if(cam)cam.getTracks().forEach(t=>t.stop());cam=null;$('ov').hidden=true}
 /* ===== host: sound, announcer, effects ===== */
-let AC,S,cur='',tok=0,seen=0,shown={},revealDone=true,dur=1,lastTick=-1;
+let PRACTICE=false,AC,S,cur='',tok=0,seen=0,shown={},revealDone=true,dur=1,lastTick=-1;
 function tone(f,d=.15,ty='square',v=.15,t=0,sl=0){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain(),n=AC.currentTime+t;o.type=ty;o.frequency.setValueAtTime(f,n);if(sl)o.frequency.exponentialRampToValueAtTime(f*sl,n+d);g.gain.setValueAtTime(v,n);g.gain.exponentialRampToValueAtTime(.001,n+d);o.connect(g);g.connect(AC.destination);o.start(n);o.stop(n+d)}
 const sfx={thud:()=>tone(140,.3,'sine',.6,0,.3),ding:()=>{tone(880,.3,'triangle');tone(1320,.4,'triangle',.12,.08)},tick:()=>tone(1400,.05,'square',.07),
 sting:()=>[392,523,659,784,1046].forEach((f,i)=>tone(f,.3,'sawtooth',.09,i*.09)),drum:()=>{for(let i=0;i<26;i++)tone(110+i*4,.09,'triangle',.2,i*.08)},
@@ -128,9 +129,9 @@ function boom(x,y,n=140){for(let i=0;i<n;i++){const a=Math.random()*6.28,s=4+Mat
 (function loop(){cx.clearRect(0,0,cv.width,cv.height);P=P.filter(p=>p.l-->0);P.forEach(p=>{p.vy+=.25;p.x+=p.vx;p.y+=p.vy;p.vx*=.99;cx.save();cx.translate(p.x,p.y);cx.rotate(p.o+=.2);cx.fillStyle=p.c;cx.fillRect(-p.r,-p.r/2,p.r*2,p.r);cx.restore()});requestAnimationFrame(loop)})();
 const shake=()=>{const s=$('stage');s.classList.remove('shk');void s.offsetWidth;s.classList.add('shk')};
 /* ===== host: screens ===== */
-function goHost(){AC=new(window.AudioContext||window.webkitAudioContext)();$('menu').hidden=true;$('H').hidden=false;reset(true);sfx.sting();say('Ladies and gentlemen... welcome to ACRO SHOW!');
+function goHost(p){PRACTICE=!!p;AC=new(window.AudioContext||window.webkitAudioContext)();$('menu').hidden=true;$('H').hidden=false;reset(true);if(PRACTICE)act({a:'join',pid:'local',name:'You'});sfx.sting();say('Ladies and gentlemen... welcome to ACRO SHOW!');
 setInterval(()=>{tick();S=view('');render();for(const t in conns){const d=conns[t];if(d.readyState==='open')try{d.send(JSON.stringify(view(t)))}catch(e){}}},400)}
-const hact=a=>act({a,pid:''});
+const hact=a=>act({a,pid:''}),hsub=()=>{const r=act({a:'ans',pid:'local',text:$('hx').value});if(r.err)$('her').textContent=r.err;else $('hx').disabled=true};
 function podium(){const el=$('pod'),key=S.players.map(p=>p.n+p.name).join();if(el.dataset.k!==key){el.dataset.k=key;el.innerHTML=S.players.map(p=>{shown[p.n]??=p.score;return`<div class=chip id=c${p.n} style="border-color:${p.color}">${esc(p.name)}<b id=s${p.n}>${shown[p.n]}</b></div>`}).join('')}
 S.players.forEach(p=>$('c'+p.n).classList.toggle('done',!!p.done))}
 function setScores(){S.players.forEach(p=>{const f=shown[p.n]??0,t=p.score;if(f===t)return;shown[p.n]=t;const el=$('s'+p.n);if(!el)return;const t0=performance.now();(function g(x){const k=Math.min(1,(x-t0)/1000);el.textContent=Math.round(f+(t-f)*k);if(k<1)requestAnimationFrame(g)})(t0);el.parentNode.classList.add('pop');setTimeout(()=>el.parentNode.classList.remove('pop'),700)})}
@@ -139,13 +140,13 @@ function render(){podium();if(S.phase!=='result'||revealDone)setScores();
 $('rd').textContent=S.round?`ROUND ${S.round}/${S.rounds}`:'';$('ct').textContent=['letters','write','vote'].includes(S.phase)?S.cat:'';
 const left=Math.max(0,S.end-now()),tm=S.phase==='write'||S.phase==='vote';$('tb').style.width=tm?(left/dur*100)+'%':'0';$('tm').textContent=tm?Math.ceil(left)+'s':'';
 if(tm&&left<=5&&Math.ceil(left)!==lastTick){lastTick=Math.ceil(left);sfx.tick();$('tb').style.background='#ff4b5c'}
-if(S.phase==='lobby'){const st=$('st');if(st)st.hidden=S.players.length<2;const np=$('np');if(np)np.textContent=S.players.length?S.players.length+' contestant'+(S.players.length>1?'s':'')+' in the studio':'';
+if(S.phase==='lobby'){const st=$('st');if(st)st.hidden=S.players.length<(PRACTICE?1:2);const np=$('np');if(np)np.textContent=S.players.length?S.players.length+' contestant'+(S.players.length>1?'s':'')+' in the studio':'';
 if(S.players.length>seen){const p=S.players[S.players.length-1],b=document.createElement('div');b.className='cat';b.textContent='🚪 '+p.name+' ENTERS THE STUDIO!';b.style.color=p.color;$('stage').appendChild(b);sfx.ding();say('Please welcome, '+p.name+'!',1);boom(innerWidth/2,innerHeight/2,80);setTimeout(()=>b.remove(),2500)}seen=S.players.length}
 const key=S.phase+S.round;if(key===cur)return;cur=key;tok++;({lobby,letters,write,vote,result,final})[S.phase](tok)}
-function lobby(){seen=S.players.length;shown={};$('stage').innerHTML='<h1 class=logo>ACRO·SHOW</h1><div class=cat style="font-size:22px">Tap ➕ ADD PLAYER. Each player opens the game, taps JOIN, scans my code, then shows me their screen.</div><div id=np class=cat></div><button id=st hidden onclick="hact(\'start\')">START THE SHOW</button>'}
+function lobby(){seen=S.players.length;shown={};$('stage').innerHTML='<h1 class=logo>ACRO·SHOW</h1><div class=cat style="font-size:22px">'+(PRACTICE?'🧪 PRACTICE MODE: you play alone on this phone and voting is skipped. Tap START.':'Tap ➕ ADD PLAYER. Each player opens the game, taps JOIN, scans my code, then shows me their screen.')+'</div><div id=np class=cat></div><button id=st hidden onclick="hact(\'start\')">START THE SHOW</button>'}
 async function letters(t){dur=1;$('stage').innerHTML=`<div class=cat>${esc(S.cat)}</div>`+tiles();sfx.sting();say(`Round ${S.round}! Your category is... ${S.cat}`,1);await sl(3600);
 const ts=document.querySelectorAll('.t');for(let i=0;i<ts.length;i++){if(t!==tok)return;ts[i].classList.add('in');sfx.thud();shake();const r=ts[i].getBoundingClientRect();boom(r.x+40,r.y+40,25);say(S.letters[i],1);await sl(1600)}}
-function write(t){dur=S.end-now();lastTick=-1;$('tb').style.background='';$('stage').innerHTML=`<div class=cat>${esc(S.cat)}</div>`+tiles()+'<div class=cat id=lk>Write your phrase on your phone!</div>';document.querySelectorAll('.t').forEach(e=>e.classList.add('in'));sfx.sting();say(S.letters.join('. ')+'. Go!',1);
+function write(t){dur=S.end-now();lastTick=-1;$('tb').style.background='';$('stage').innerHTML=`<div class=cat>${esc(S.cat)}</div>`+tiles()+'<div class=cat id=lk>Write your phrase on your phone!</div>'+(PRACTICE?'<input id=hx maxlength=90 autocomplete=off placeholder="One word per letter"><div id=her style="color:#ff4b5c;min-height:22px"></div><button onclick=hsub()>LOCK IT IN</button>':'');document.querySelectorAll('.t').forEach(e=>e.classList.add('in'));sfx.sting();say(S.letters.join('. ')+'. Go!',1);
 const iv=setInterval(()=>{if(t!==tok)return clearInterval(iv);$('lk').textContent=`🔒 ${S.players.filter(p=>p.done).length}/${S.players.length} contestants locked in`},400)}
 async function vote(t){dur=S.end-now();lastTick=-1;$('tb').style.background='';$('stage').innerHTML='<div class=cat>Vote for your favorite!</div><div id=cards></div>';say('Here are the answers!',1);await sl(1500);
 for(let i=0;i<S.answers.length;i++){if(t!==tok)return;const a=S.answers[i],d=document.createElement('div');d.className='cd';d.innerHTML=`<i>#${i+1}</i>${esc(a.text)}`;$('cards').appendChild(d);sfx.ding();say(`Number ${i+1}. ${a.text}`,1);await sl(1600+a.text.length*65)}
